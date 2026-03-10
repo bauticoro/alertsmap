@@ -26,7 +26,7 @@ apt update && apt install -y python3 python3-pip python3-venv git
 
 ```bash
 cd /opt
-git clone https://github.com/TU_USUARIO/scraper-aliado.git
+git clone https://github.com/bauticoro/alertsmap.git scraper-aliado
 cd scraper-aliado
 ```
 
@@ -186,6 +186,31 @@ systemctl enable aliado-monitor
 systemctl start aliado-monitor
 systemctl status aliado-monitor
 ```
+
+---
+
+## Actualizar el código en el droplet
+
+Cuando hagas cambios y los subas a GitHub, actualiza el droplet así:
+
+### 1. Desde tu máquina local: commit y push
+
+```bash
+git add .
+git commit -m "Descripción de los cambios"
+git push origin main
+```
+
+### 2. En el droplet: ejecutar el script de actualización
+
+```bash
+ssh root@TU_IP_DEL_DROPLET
+cd /opt/scraper-aliado
+chmod +x scripts/update_droplet.sh
+./scripts/update_droplet.sh
+```
+
+El script hace `git pull`, actualiza dependencias, reconstruye Docker (si lo usas) y reinicia el servicio systemd (si existe). Si usas cron, no hace falta reiniciar nada: el cron usará el nuevo código en la próxima ejecución.
 
 ---
 

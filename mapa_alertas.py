@@ -288,8 +288,9 @@ def main():
         print(f"JSON copiado a {web_json} (para Vercel)")
 
         template_path = web_dir / "index.template.html"
+        output_path = web_dir / "index.html"
         if template_path.exists():
-            build_web(web_json, template_path, template_path)
+            build_web(web_json, template_path, output_path)
 
     print(f"Mapa guardado en: {output_file}")
     print("Abre el archivo en tu navegador para ver las alertas.")
