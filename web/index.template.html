@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa nacional de alertas - Chofex</title>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-QDD6CP6HX6"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-QDD6CP6HX6');
+  </script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.Default.css"/>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    #map { position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
+    .leaflet-popup-content { margin: 0; }
+    .leaflet-popup-content-wrapper { border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08); }
+    .leaflet-popup-tip { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .loading {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: #fff; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 12px; z-index: 9999;
+    }
+    .loading.hidden { display: none; }
+    .spinner { width: 40px; height: 40px; border: 3px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error { color: #dc2626; padding: 20px; text-align: center; }
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
+    .chofex-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 48px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      z-index: 1000;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+    .chofex-banner a {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: #0f172a;
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: -0.03em;
+      transition: opacity 0.2s ease;
+    }
+    .chofex-banner a:hover { opacity: 0.9; }
+    .chofex-banner-title {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 15px;
+      font-weight: 500;
+      color: #475569;
+      letter-spacing: -0.01em;
+    }
+    .chofex-logo-img {
+      height: 32px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+    }
+    #map { top: 48px; }
+    .branding-frame {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 20px 10px 16px;
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(30, 41, 59, 0.9) 100%);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      border-radius: 100px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+      z-index: 1000;
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      color: rgba(248, 250, 252, 0.9);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .branding-frame:hover {
+      transform: translateX(-50%) translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+    }
+    .branding-frame::before {
+      content: '';
+      display: block;
+      flex-shrink: 0;
+      width: 6px;
+      height: 6px;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      border-radius: 50%;
+      box-shadow: 0 0 12px rgba(37, 99, 235, 0.5);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(0.9); }
+    }
+    .branding-frame a {
+      color: #fff;
+      text-decoration: none;
+      font-weight: 600;
+      background: linear-gradient(135deg, #60a5fa, #3b82f6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      transition: opacity 0.2s ease;
+    }
+    .branding-frame a:hover { opacity: 0.9; }
+    #map { bottom: 0; }
+    /* Clusters de alertas inactivas (gris) */
+    .marker-cluster-inactive.marker-cluster-small { background-color: rgba(156, 163, 175, 0.5); }
+    .marker-cluster-inactive.marker-cluster-small div { background-color: rgba(107, 114, 128, 0.7); }
+    .marker-cluster-inactive.marker-cluster-medium { background-color: rgba(156, 163, 175, 0.5); }
+    .marker-cluster-inactive.marker-cluster-medium div { background-color: rgba(107, 114, 128, 0.7); }
+    .marker-cluster-inactive.marker-cluster-large { background-color: rgba(156, 163, 175, 0.5); }
+    .marker-cluster-inactive.marker-cluster-large div { background-color: rgba(107, 114, 128, 0.7); }
+    /* Clusters de alertas activas (color) */
+    .marker-cluster-active.marker-cluster-small { background-color: rgba(147, 197, 253, 0.6); }
+    .marker-cluster-active.marker-cluster-small div { background-color: rgba(59, 130, 246, 0.8); }
+    .marker-cluster-active.marker-cluster-medium { background-color: rgba(253, 186, 116, 0.6); }
+    .marker-cluster-active.marker-cluster-medium div { background-color: rgba(249, 115, 22, 0.8); }
+    .marker-cluster-active.marker-cluster-large { background-color: rgba(252, 165, 165, 0.6); }
+    .marker-cluster-active.marker-cluster-large div { background-color: rgba(239, 68, 68, 0.8); }
+  </style>
+</head>
+<body>
+  <header class="chofex-banner">
+    <a href="https://chofex.com?utm_source=mapadealertas&utm_medium=referral&utm_campaign=mapa-alertas" target="_blank" rel="noopener">
+      <img src="https://www.chofex.com/assets/logo-chofex-color-O6e_H_to.png" alt="Chofex" class="chofex-logo-img">
+    </a>
+    <span class="chofex-banner-title">Mapa nacional de alertas</span>
+  </header>
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+    <span>Cargando alertas...</span>
+  </div>
+  <div id="map"></div>
+  <div class="branding-frame"><span>Creado por</span> <a href="https://chofex.com?utm_source=mapadealertas&utm_medium=referral&utm_campaign=mapa-alertas" target="_blank" rel="noopener">chofex.com</a></div>
+
+  <script type="text/plain" id="__cfg" data-t="b64">{{__ALERTS_B64__}}</script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/leaflet.markercluster.js"></script>
+  <script>
+    const ALERT_COLORS = { default: 'red', incendio: 'orange', inundación: 'blue', sismo: 'purple', accidente: 'darkred', seguridad: 'darkblue' };
+
+    function isActiveAlert(alert) {
+      return (alert.status || '').toUpperCase() === 'ACTIVE';
+    }
+
+    function getColor(alert) {
+      const status = (alert.status || '').toUpperCase();
+      if (status === 'PAST') return 'gray';
+      if (status === 'ACTIVE') return 'blue';
+      const type = ((alert.alertType || {}).name || '').toLowerCase();
+      for (const [key, color] of Object.entries(ALERT_COLORS)) {
+        if (key !== 'default' && type.includes(key)) return color;
+      }
+      return ALERT_COLORS.default;
+    }
+
+    function createClusterIcon(className) {
+      return function(cluster) {
+        const count = cluster.getChildCount();
+        let sizeClass = 'marker-cluster-small';
+        if (count >= 100) sizeClass = 'marker-cluster-large';
+        else if (count >= 10) sizeClass = 'marker-cluster-medium';
+        return L.divIcon({
+          html: '<div><span>' + count + '</span></div>',
+          className: 'marker-cluster ' + className + ' ' + sizeClass,
+          iconSize: L.point(40, 40)
+        });
+      };
+    }
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatDesc(desc, maxLen = 450) {
+      if (!desc) return '';
+      const lines = desc.trim().split('\n').map(l => l.trim()).filter(Boolean);
+      if (!lines.length) return '';
+      const location = [], tip = [], body = [];
+      let total = 0;
+      for (const line of lines) {
+        if (total >= maxLen) break;
+        const esc = escapeHtml(line);
+        if (line.startsWith('📍')) location.push(esc);
+        else if (line.startsWith('✅')) tip.push(esc.replace(/✅/g, '').trim());
+        else body.push(esc);
+        total += line.length + 1;
+      }
+      const chunks = [];
+      if (location.length) chunks.push(location.join(' '));
+      if (body.length) chunks.push(body.join(' '));
+      if (tip.length) chunks.push('Consejo: ' + tip.join(' '));
+      return chunks.join(' ') || 'Sin más detalles.';
+    }
+
+    function formatStatus(s) {
+      const u = (s || '').toUpperCase();
+      return u === 'PAST' ? 'finalizada' : u === 'ACTIVE' ? 'vigente' : '';
+    }
+
+    function formatType(t) {
+      if (!t) return '';
+      const x = t.toLowerCase();
+      return x === 'vial' ? 'Alerta vial' : x === 'general' ? 'Alerta general' : 'Alerta ' + x;
+    }
+
+    function popupHtml(alert) {
+      const title = escapeHtml(alert.title || 'Sin título');
+      const desc = formatDesc(alert.description || '') || 'Sin más detalles.';
+      const type = (alert.alertType || {}).name || '';
+      const status = formatStatus(alert.status);
+      const isActive = (alert.status || '').toUpperCase() === 'ACTIVE';
+      const hasPhotos = alert.photos && alert.photos.length > 0;
+      const accentColor = getColor(alert);
+      const accentHex = { red: '#ef4444', orange: '#f97316', blue: '#3b82f6', purple: '#8b5cf6', darkred: '#b91c1c', darkblue: '#1e40af', gray: '#6b7280' }[accentColor] || '#ef4444';
+
+      const typeLabel = formatType(type);
+      const statusBadge = status ? `<span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;background:${isActive ? 'rgba(34,197,94,0.15)' : 'rgba(107,114,128,0.15)'};color:${isActive ? '#16a34a' : '#6b7280'};">${status}</span>` : '';
+      const typeBadge = typeLabel ? `<span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(59,130,246,0.12);color:#2563eb;">${typeLabel}</span>` : '';
+      const badges = [typeBadge, statusBadge].filter(Boolean).join(' ');
+
+      return `<div class="alert-popup" style="min-width:260px;max-width:380px;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+        <div style="height:4px;background:${accentHex};"></div>
+        <div style="padding:16px 18px;">
+          <h3 style="margin:0 0 12px;font-size:15px;font-weight:700;line-height:1.35;color:#0f172a;letter-spacing:-0.02em;">${title}</h3>
+          ${badges ? `<div style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:6px;">${badges}</div>` : ''}
+          <p style="margin:0;font-size:13px;line-height:1.55;color:#475569;">${desc}${hasPhotos ? ' <span style="display:inline-flex;align-items:center;gap:4px;color:#64748b;font-size:12px;">📷 Fotos adjuntas</span>' : ''}</p>
+        </div>
+      </div>`;
+    }
+
+    async function init() {
+      const map = L.map('map', { center: [23.6, -102.5], zoom: 5 });
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '',
+        subdomains: 'abcd'
+      }).addTo(map);
+      L.control.scale().addTo(map);
+
+      let alerts = [];
+      try {
+        const el = document.getElementById('__cfg');
+        if (el && el.textContent && el.textContent !== '{{__ALERTS_B64__}}') {
+          const raw = atob(el.textContent.trim());
+          const data = JSON.parse(raw);
+          alerts = Array.isArray(data) ? data : [data];
+        } else {
+          const res = await fetch('alertas.json');
+          if (!res.ok) throw new Error('No se pudo cargar alertas.json');
+          const data = await res.json();
+          alerts = Array.isArray(data) ? data : [data];
+        }
+      } catch (e) {
+        document.getElementById('loading').innerHTML = `<div class="error"><strong>Error:</strong> ${e.message}<br><br>Asegúrate de ejecutar el build o tener alertas.json en web/.</div>`;
+        return;
+      }
+
+      const valid = alerts.filter(a => a.latlon && a.latlon.lat != null && a.latlon.lon != null);
+      if (!valid.length) {
+        document.getElementById('loading').innerHTML = '<div class="error">No hay alertas con coordenadas válidas.</div>';
+        return;
+      }
+
+      const activeAlerts = valid.filter(a => isActiveAlert(a));
+      const inactiveAlerts = valid.filter(a => !isActiveAlert(a));
+
+      const clusterActive = L.markerClusterGroup({
+        maxClusterRadius: 80,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+        iconCreateFunction: createClusterIcon('marker-cluster-active')
+      });
+      const clusterInactive = L.markerClusterGroup({
+        maxClusterRadius: 80,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+        iconCreateFunction: createClusterIcon('marker-cluster-inactive')
+      });
+      const bounds = [];
+
+      function addMarker(alert, cluster) {
+        const lat = parseFloat(alert.latlon.lat);
+        const lon = parseFloat(alert.latlon.lon);
+        bounds.push([lat, lon]);
+        const marker = L.marker([lat, lon], {
+          icon: L.divIcon({
+            className: 'custom-marker',
+            html: `<span style="background:${getColor(alert)};width:24px;height:24px;border-radius:50%;display:inline-block;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          })
+        });
+        marker.bindPopup(popupHtml(alert), { maxWidth: 400 });
+        marker.bindTooltip(alert.title || 'Ver detalles');
+        cluster.addLayer(marker);
+      }
+
+      activeAlerts.forEach(alert => addMarker(alert, clusterActive));
+      inactiveAlerts.forEach(alert => addMarker(alert, clusterInactive));
+
+      map.addLayer(clusterInactive);
+      map.addLayer(clusterActive);
+      if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] });
+      document.getElementById('loading').classList.add('hidden');
+    }
+
+    init();
+  </script>
+</body>
+</html>

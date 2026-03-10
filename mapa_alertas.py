@@ -277,13 +277,19 @@ def main():
     output_file = output_dir / "mapa_alertas.html"
     m.save(str(output_file))
 
-    # Copiar JSON a web/ para deploy en Vercel
+    # Copiar JSON a web/ y generar index.html con data embebida (evita fetch en Network)
     web_dir = Path(__file__).parent / "web"
     if web_dir.exists():
         import shutil
+        from build_web import build_web
+
         web_json = web_dir / "alertas.json"
         shutil.copy2(json_path, web_json)
         print(f"JSON copiado a {web_json} (para Vercel)")
+
+        template_path = web_dir / "index.template.html"
+        if template_path.exists():
+            build_web(web_json, template_path, template_path)
 
     print(f"Mapa guardado en: {output_file}")
     print("Abre el archivo en tu navegador para ver las alertas.")

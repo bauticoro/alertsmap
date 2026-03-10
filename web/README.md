@@ -29,4 +29,4 @@ python3 scrape_aliado_mexico.py
 python3 mapa_alertas.py
 ```
 
-El script `mapa_alertas.py` copia automáticamente el JSON a `web/alertas.json`. Luego haz commit y push, o vuelve a desplegar con `vercel --prod`.
+El script `mapa_alertas.py` copia el JSON a `web/alertas.json` y genera `index.html` con los datos embebidos (base64). Así no aparece ninguna petición a `alertas.json` en la pestaña Network de DevTools. Luego haz commit y push, o vuelve a desplegar con `vercel --prod`.

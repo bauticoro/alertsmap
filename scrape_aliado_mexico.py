@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Script para obtener alertas neuralgicas de Aliado recorriendo todo México
-dividiendo el territorio en bounding boxes.
+Script para obtener alertas neuralgicas de Aliado para todo México
+en una sola petición a la API.
 
 Optimizado para ser indetectable: TLS fingerprinting (curl_cffi), headers
-completos tipo navegador, timing humano y retry con backoff.
+completos tipo navegador y retry con backoff.
 """
 
 import json
@@ -55,10 +55,8 @@ MEXICO_BOUNDS = {
     "max_lon": -86.7,
 }
 
-# Tamaño de cada celda del grid (en grados)
-# Ajustar según necesidad: más pequeño = más requests pero cobertura más fina
-LAT_STEP = 3.0  # grados de latitud por celda
-LON_STEP = 3.0  # grados de longitud por celda
+# Máximo de alertas por request (la API soporta hasta ~500)
+FIRST = 500
 
 API_URL = "https://alertas.aliado.alephri.com/api/graphql"
 BEARER_TOKEN = "e2e29d3164218e91ea40dd6c63808b79"
@@ -76,8 +74,8 @@ fragment NeuralgicAlertCoreFields on NeuralgicAlert {
   __typename
 }
 
-query GET_NEURALGIC_ALERTS_FOR_LIST($filters: NeuralgicAlertsFiltersInput, $first: Int) {
-  neuralgicAlerts(filters: $filters, first: $first) {
+query GET_NEURALGIC_ALERTS_FOR_LIST($filters: NeuralgicAlertsFiltersInput, $first: Int, $after: String) {
+  neuralgicAlerts(filters: $filters, first: $first, after: $after) {
     edges {
       node {
         ...NeuralgicAlertCoreFields
@@ -92,6 +90,10 @@ query GET_NEURALGIC_ALERTS_FOR_LIST($filters: NeuralgicAlertsFiltersInput, $firs
         __typename
       }
       __typename
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
     __typename
   }
@@ -109,39 +111,12 @@ def get_date_range(days_back: int = 1):
     }
 
 
-def generate_bounding_boxes():
-    """Genera todos los bounding boxes que cubren México."""
-    boxes = []
-    lat = MEXICO_BOUNDS["min_lat"]
-    while lat < MEXICO_BOUNDS["max_lat"]:
-        lon = MEXICO_BOUNDS["min_lon"]
-        while lon < MEXICO_BOUNDS["max_lon"]:
-            bottom_left = {
-                "lat": lat,
-                "lon": lon,
-            }
-            top_right = {
-                "lat": min(lat + LAT_STEP, MEXICO_BOUNDS["max_lat"]),
-                "lon": min(lon + LON_STEP, MEXICO_BOUNDS["max_lon"]),
-            }
-            boxes.append({
-                "bottomLeft": bottom_left,
-                "topRight": top_right,
-            })
-            lon += LON_STEP
-        lat += LAT_STEP
-    return boxes
-
-
-def _human_delay():
-    """
-    Pausa con distribución tipo humana: más larga ocasionalmente, con variación.
-    Usa exponencial para simular pausas de lectura/navegación.
-    """
-    base = random.uniform(1.2, 3.0)
-    jitter = random.expovariate(0.5)  # Pausas ocasionales más largas
-    delay = min(base + jitter, 8.0)  # Cap máximo 8s para no alargar demasiado
-    time.sleep(max(delay, 0.8))
+def get_mexico_bounding_box():
+    """Devuelve el bounding box completo de México."""
+    return {
+        "bottomLeft": {"lat": MEXICO_BOUNDS["min_lat"], "lon": MEXICO_BOUNDS["min_lon"]},
+        "topRight": {"lat": MEXICO_BOUNDS["max_lat"], "lon": MEXICO_BOUNDS["max_lon"]},
+    }
 
 
 def _get_headers(impersonate: Optional[str] = None) -> dict:
@@ -184,55 +159,80 @@ def is_inside_mexico(latlon: Optional[dict]) -> bool:
     )
 
 
-def fetch_alerts_for_box(session, bounding_box: dict, date_range: dict, impersonate: Optional[str]) -> list:
-    """Hace la petición a la API para un bounding box específico con retry y backoff."""
-    headers = _get_headers(impersonate)
-    payload = {
-        "operationName": "GET_NEURALGIC_ALERTS_FOR_LIST",
-        "variables": {
-            "filters": {
-                "boundingBox": bounding_box,
-                **date_range,
+def fetch_all_alerts(session, bounding_box: dict, date_range: dict, impersonate: Optional[str]) -> list:
+    """Obtiene todas las alertas de México en una o más peticiones (con paginación si hace falta)."""
+    all_nodes = []
+    after_cursor = None
+    page = 1
+
+    while True:
+        headers = _get_headers(impersonate)
+        payload = {
+            "operationName": "GET_NEURALGIC_ALERTS_FOR_LIST",
+            "variables": {
+                "filters": {
+                    "boundingBox": bounding_box,
+                    **date_range,
+                },
+                "first": FIRST,
+                "after": after_cursor,
             },
-            "first": 100,
-        },
-        "query": GRAPHQL_QUERY.strip(),
-    }
-    timeout = random.uniform(25, 45)  # Timeout variable para evitar patrón fijo
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            kwargs = {"headers": headers, "json": payload, "timeout": timeout}
-            if USE_CURL_CFFI and impersonate:
-                kwargs["impersonate"] = impersonate
-            resp = session.post(API_URL, **kwargs)
-            if resp.status_code == 429:
-                wait = (2 ** attempt) + random.uniform(5, 15)
-                print(f"  Rate limit (429), esperando {wait:.1f}s...")
-                time.sleep(wait)
-                continue
-            resp.raise_for_status()
-            data = resp.json()
-            edges = data.get("data", {}).get("neuralgicAlerts", {}).get("edges", [])
-            return [e["node"] for e in edges]
-        except Exception as e:
-            if attempt < max_retries - 1:
-                backoff = (2 ** attempt) + random.uniform(1, 4)
-                print(f"  Error: {e}, reintento en {backoff:.1f}s...")
-                time.sleep(backoff)
-            else:
-                print(f"  Error en request: {e}")
-                return []
-    return []
+            "query": GRAPHQL_QUERY.strip(),
+        }
+        timeout = random.uniform(25, 45)
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                kwargs = {"headers": headers, "json": payload, "timeout": timeout}
+                if USE_CURL_CFFI and impersonate:
+                    kwargs["impersonate"] = impersonate
+                resp = session.post(API_URL, **kwargs)
+                if resp.status_code == 429:
+                    wait = (2 ** attempt) + random.uniform(5, 15)
+                    print(f"  Rate limit (429), esperando {wait:.1f}s...")
+                    time.sleep(wait)
+                    continue
+                resp.raise_for_status()
+                data = resp.json()
+                alerts_data = data.get("data", {}).get("neuralgicAlerts", {})
+                edges = alerts_data.get("edges", [])
+                page_info = alerts_data.get("pageInfo", {})
+
+                nodes = [e["node"] for e in edges]
+                all_nodes.extend(nodes)
+
+                if page == 1:
+                    print(f"  Página 1: {len(nodes)} alertas", end="")
+                else:
+                    print(f"  Página {page}: +{len(nodes)} alertas", end="")
+
+                if not page_info.get("hasNextPage"):
+                    print()
+                    return all_nodes
+
+                after_cursor = page_info.get("endCursor")
+                page += 1
+                time.sleep(random.uniform(0.5, 1.5))  # Pausa breve entre páginas
+                break
+
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    backoff = (2 ** attempt) + random.uniform(1, 4)
+                    print(f"  Error: {e}, reintento en {backoff:.1f}s...")
+                    time.sleep(backoff)
+                else:
+                    print(f"  Error en request: {e}")
+                    return all_nodes
+
+    return all_nodes
 
 
 def main():
     date_range = get_date_range(days_back=1)
-    boxes = generate_bounding_boxes()
-    random.shuffle(boxes)  # Orden aleatorio para no parecer barrido sistemático
+    bounding_box = get_mexico_bounding_box()
     impersonate = random.choice(IMPERSONATE_TARGETS) if USE_CURL_CFFI else None
 
-    print(f"Recorriendo {len(boxes)} bounding boxes sobre México")
+    print("Obteniendo alertas de todo México (una sola carga)")
     print(f"Rango de fechas: {date_range['startDatetime']} -> {date_range['endDatetime']}")
     if USE_CURL_CFFI:
         print(f"Fingerprint: {impersonate}")
@@ -240,26 +240,16 @@ def main():
         print("(curl_cffi no instalado, usando requests estándar)")
     print("-" * 60)
 
-    all_alerts = []
-    seen_ids = set()
     session = curl_requests.Session()
+    raw_alerts = fetch_all_alerts(session, bounding_box, date_range, impersonate)
 
-    # Pausa inicial tipo humana: variable, no arranque instantáneo
-    time.sleep(random.uniform(1.5, 4.0))
-
-    for i, box in enumerate(boxes):
-        bl = box["bottomLeft"]
-        tr = box["topRight"]
-        print(f"[{i+1}/{len(boxes)}] Box: lat [{bl['lat']:.2f},{tr['lat']:.2f}] lon [{bl['lon']:.2f},{tr['lon']:.2f}]", end=" ")
-        alerts = fetch_alerts_for_box(session, box, date_range, impersonate)
-        new_count = 0
-        for a in alerts:
-            if a["id"] not in seen_ids and is_inside_mexico(a.get("latlon")):
-                seen_ids.add(a["id"])
-                all_alerts.append(a)
-                new_count += 1
-        print(f"-> {len(alerts)} alertas ({new_count} nuevas)")
-        _human_delay()
+    # Filtrar dentro de México y deduplicar por id
+    seen_ids = set()
+    all_alerts = []
+    for a in raw_alerts:
+        if a["id"] not in seen_ids and is_inside_mexico(a.get("latlon")):
+            seen_ids.add(a["id"])
+            all_alerts.append(a)
 
     output_dir = Path(__file__).parent / "output"
     output_dir.mkdir(exist_ok=True)
