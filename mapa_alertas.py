@@ -62,57 +62,95 @@ def _escape_html(text: str) -> str:
     )
 
 
-def _format_description(desc: str, max_len: int = 400) -> str:
-    """Formatea la descripción: escapa HTML, reemplaza saltos de línea y trunca si es necesario."""
+def _format_description(desc: str, max_len: int = 450) -> str:
+    """Formatea la descripción como texto fluido y legible."""
     if not desc:
-        return "Sin descripción"
-    desc = desc.strip()
-    if len(desc) > max_len:
-        desc = desc[:max_len].rsplit(" ", 1)[0] + "..."
-    desc = _escape_html(desc)
-    return desc.replace("\n", "<br>")
+        return ""
+    lines = [ln.strip() for ln in desc.strip().split("\n") if ln.strip()]
+    if not lines:
+        return ""
+
+    location_parts = []
+    tip_parts = []
+    body_parts = []
+    total_len = 0
+
+    for line in lines:
+        if total_len >= max_len:
+            break
+        escaped = _escape_html(line)
+        if line.startswith("📍"):
+            location_parts.append(escaped)
+        elif line.startswith("✅"):
+            tip_parts.append(escaped)
+        else:
+            body_parts.append(escaped)
+        total_len += len(line) + 1
+
+    # Un solo párrafo fluido, sin bloques rígidos
+    chunks = []
+    if location_parts:
+        chunks.append(" ".join(location_parts))
+    if body_parts:
+        chunks.append(" ".join(body_parts))
+    if tip_parts:
+        chunks.append("Consejo: " + " ".join(t.replace("✅", "").strip() for t in tip_parts))
+
+    text = " ".join(chunks)
+    if not text:
+        return ""
+    return text
 
 
-def _format_status(status: str) -> str:
-    """Traduce el status a español."""
+def _format_status_natural(status: str) -> str:
+    """Status en lenguaje natural."""
     s = (status or "").upper()
     if s == "PAST":
-        return "Pasada"
+        return "finalizada"
     if s == "ACTIVE":
-        return "Activa"
-    return status or "N/A"
+        return "vigente"
+    return ""
 
 
-def _format_alert_type(alert_type: str) -> str:
-    """Capitaliza el tipo de alerta."""
-    if not alert_type or alert_type == "N/A":
-        return "N/A"
-    return alert_type.strip().capitalize()
+def _format_alert_type_natural(alert_type: str) -> str:
+    """Tipo de alerta en lenguaje natural."""
+    if not alert_type:
+        return ""
+    t = alert_type.strip().lower()
+    if t == "vial":
+        return "Alerta vial"
+    if t == "general":
+        return "Alerta general"
+    return f"Alerta {t}"
 
 
 def create_popup_html(alert: dict) -> str:
-    """Genera HTML para el popup del marcador con mejor presentación."""
+    """Genera HTML para el popup: diseño limpio y legible como una notificación."""
     title = _escape_html(alert.get("title") or "Sin título")
     description = _format_description(alert.get("description") or "")
 
-    alert_type = _format_alert_type((alert.get("alertType") or {}).get("name") or "")
-    status = _format_status(alert.get("status") or "")
-    status_color = get_status_color(alert.get("status") or "")
+    alert_type = (alert.get("alertType") or {}).get("name") or ""
+    status = _format_status_natural(alert.get("status") or "")
+    status_color = "#16a34a" if (alert.get("status") or "").upper() == "ACTIVE" else "#737373"
 
-    # Badge para indicar si hay fotos
+    # Línea de contexto: "Alerta vial · Vigente"
+    meta_parts = []
+    if alert_type:
+        meta_parts.append(_format_alert_type_natural(alert_type))
+    if status:
+        meta_parts.append(status)
+    meta_line = " · ".join(meta_parts) if meta_parts else ""
+
     has_photos = bool(alert.get("photos") and len(alert.get("photos", [])) > 0)
+    photos_note = " Tiene fotos adjuntas." if has_photos else ""
+    if not description:
+        description = "Sin más detalles."
 
     return f"""
-    <div style="min-width: 200px; max-width: 380px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-        <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 10px;">
-            <h4 style="margin: 0; font-size: 1em; font-weight: 600; color: #111827; line-height: 1.35;">{title}</h4>
-            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
-                <span style="background: #f3f4f6; color: #374151; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 500;">{alert_type}</span>
-                <span style="background: {status_color}22; color: {status_color}; padding: 2px 8px; border-radius: 4px; font-size: 0.75em; font-weight: 600;">{status}</span>
-                {f'<span style="background: #dbeafe; color: #1d4ed8; padding: 2px 8px; border-radius: 4px; font-size: 0.75em;">📷 Fotos</span>' if has_photos else ''}
-            </div>
-        </div>
-        <p style="margin: 0; font-size: 0.85em; color: #4b5563; line-height: 1.5;">{description}</p>
+    <div style="min-width: 220px; max-width: 360px; font-family: Georgia, 'Times New Roman', serif; font-size: 15px; line-height: 1.6; color: #1f2937;">
+        <p style="margin: 0 0 12px 0; font-weight: 600; font-size: 16px; color: #111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">{title}</p>
+        {f'<p style="margin: 0 0 10px 0; font-size: 13px; color: {status_color};">{meta_line}</p>' if meta_line else ''}
+        <p style="margin: 0; font-size: 14px; color: #374151;">{description}{photos_note}</p>
     </div>
     """
 
@@ -207,6 +245,14 @@ def main():
     output_dir.mkdir(exist_ok=True)
     output_file = output_dir / "mapa_alertas.html"
     m.save(str(output_file))
+
+    # Copiar JSON a web/ para deploy en Vercel
+    web_dir = Path(__file__).parent / "web"
+    if web_dir.exists():
+        import shutil
+        web_json = web_dir / "alertas.json"
+        shutil.copy2(json_path, web_json)
+        print(f"JSON copiado a {web_json} (para Vercel)")
 
     print(f"Mapa guardado en: {output_file}")
     print("Abre el archivo en tu navegador para ver las alertas.")
