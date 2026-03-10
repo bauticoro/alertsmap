@@ -38,21 +38,21 @@
       left: 0;
       right: 0;
       height: 48px;
-      background: linear-gradient(90deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
+      background: #fff;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 12px;
       z-index: 1000;
-      box-shadow: 0 2px 12px rgba(37, 99, 235, 0.35);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     }
     .chofex-banner a {
       display: flex;
       align-items: center;
       gap: 10px;
       text-decoration: none;
-      color: #fff;
+      color: #0f172a;
       font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       font-weight: 700;
       font-size: 18px;
@@ -64,20 +64,14 @@
       font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       font-size: 15px;
       font-weight: 500;
-      color: rgba(255, 255, 255, 0.95);
+      color: #475569;
       letter-spacing: -0.01em;
     }
-    .chofex-logo-icon {
-      width: 28px;
-      height: 28px;
-      background: rgba(255, 255, 255, 0.25);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-      font-weight: 800;
-      color: #fff;
+    .chofex-logo-img {
+      height: 32px;
+      width: auto;
+      object-fit: contain;
+      display: block;
     }
     #map { top: 48px; }
     .branding-frame {
@@ -153,8 +147,7 @@
 <body>
   <header class="chofex-banner">
     <a href="https://chofex.com" target="_blank" rel="noopener">
-      <span class="chofex-logo-icon">C</span>
-      <span>Chofex</span>
+      <img src="https://www.chofex.com/assets/logo-chofex-color-O6e_H_to.png" alt="Chofex" class="chofex-logo-img">
     </a>
     <span class="chofex-banner-title">Mapa nacional de alertas</span>
   </header>
@@ -163,7 +156,7 @@
     <span>Cargando alertas...</span>
   </div>
   <div id="map"></div>
-  <div class="branding-frame"><span>Propiedad de</span> <a href="https://chofex.com" target="_blank" rel="noopener">chofex.com</a></div>
+  <div class="branding-frame"><span>Creado por</span> <a href="https://chofex.com" target="_blank" rel="noopener">chofex.com</a></div>
 
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/leaflet.markercluster.js"></script>
@@ -264,7 +257,7 @@
     async function init() {
       const map = L.map('map', { center: [23.6, -102.5], zoom: 5 });
       L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        attribution: '',
         subdomains: 'abcd'
       }).addTo(map);
       L.control.scale().addTo(map);
@@ -292,11 +285,13 @@
       const clusterActive = L.markerClusterGroup({
         maxClusterRadius: 80,
         spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
         iconCreateFunction: createClusterIcon('marker-cluster-active')
       });
       const clusterInactive = L.markerClusterGroup({
         maxClusterRadius: 80,
         spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
         iconCreateFunction: createClusterIcon('marker-cluster-inactive')
       });
       const bounds = [];

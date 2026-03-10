@@ -228,7 +228,8 @@ def main():
     m = folium.Map(
         location=MEXICO_CENTER,
         zoom_start=ZOOM_START,
-        tiles="CartoDB positron",
+        tiles="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        attr="",
         control_scale=True,
     )
 
