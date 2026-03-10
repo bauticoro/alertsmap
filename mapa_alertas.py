@@ -282,15 +282,27 @@ def main():
     # Añadir control de capas
     folium.LayerControl().add_to(m)
 
-    # Ocultar tooltip al abrir popup (evitar que se muestren ambos al hacer click)
+    # Ocultar tooltip al abrir popup; rebind al cerrar (evitar preview + tarjeta a la vez)
     map_name = m.get_name()
     close_tooltip_script = f"""
 (function() {{
   var map = {map_name};
   if (map) {{
     map.on('popupopen', function(e) {{
-      if (e.popup && e.popup._source && typeof e.popup._source.closeTooltip === 'function') {{
-        e.popup._source.closeTooltip();
+      var marker = e.popup && e.popup._source;
+      if (marker) {{
+        var tooltip = marker.getTooltip && marker.getTooltip();
+        if (tooltip) {{
+          marker._storedTooltipContent = (tooltip.options && tooltip.options.content) || tooltip._content || '';
+          marker.unbindTooltip && marker.unbindTooltip();
+        }}
+      }}
+    }});
+    map.on('popupclose', function(e) {{
+      var marker = e.popup && e.popup._source;
+      if (marker && marker._storedTooltipContent) {{
+        marker.bindTooltip(marker._storedTooltipContent, {{ permanent: false }});
+        marker._storedTooltipContent = null;
       }}
     }});
   }}

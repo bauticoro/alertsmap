@@ -359,9 +359,11 @@
             iconAnchor: [12, 12]
           })
         });
+        const tooltipContent = alert.title || 'Ver detalles';
         marker.bindPopup(popupHtml(alert), { maxWidth: 400 });
-        marker.bindTooltip(alert.title || 'Ver detalles', { permanent: false });
-        marker.on('popupopen', () => marker.closeTooltip());
+        marker.bindTooltip(tooltipContent, { permanent: false });
+        marker.on('popupopen', () => { marker.unbindTooltip(); });
+        marker.on('popupclose', () => { marker.bindTooltip(tooltipContent, { permanent: false }); });
         cluster.addLayer(marker);
       }
 
