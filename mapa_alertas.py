@@ -124,33 +124,53 @@ def _format_alert_type_natural(alert_type: str) -> str:
     return f"Alerta {t}"
 
 
+ACCENT_HEX = {
+    "red": "#ef4444",
+    "orange": "#f97316",
+    "blue": "#3b82f6",
+    "purple": "#8b5cf6",
+    "darkred": "#b91c1c",
+    "darkblue": "#1e40af",
+    "gray": "#6b7280",
+}
+
+
 def create_popup_html(alert: dict) -> str:
-    """Genera HTML para el popup: diseño limpio y legible como una notificación."""
+    """Genera HTML para el popup: diseño moderno tipo card con badges y acento de color."""
     title = _escape_html(alert.get("title") or "Sin título")
     description = _format_description(alert.get("description") or "")
-
-    alert_type = (alert.get("alertType") or {}).get("name") or ""
-    status = _format_status_natural(alert.get("status") or "")
-    status_color = "#16a34a" if (alert.get("status") or "").upper() == "ACTIVE" else "#737373"
-
-    # Línea de contexto: "Alerta vial · Vigente"
-    meta_parts = []
-    if alert_type:
-        meta_parts.append(_format_alert_type_natural(alert_type))
-    if status:
-        meta_parts.append(status)
-    meta_line = " · ".join(meta_parts) if meta_parts else ""
-
-    has_photos = bool(alert.get("photos") and len(alert.get("photos", [])) > 0)
-    photos_note = " Tiene fotos adjuntas." if has_photos else ""
     if not description:
         description = "Sin más detalles."
 
+    alert_type = (alert.get("alertType") or {}).get("name") or ""
+    status = _format_status_natural(alert.get("status") or "")
+    is_active = (alert.get("status") or "").upper() == "ACTIVE"
+    has_photos = bool(alert.get("photos") and len(alert.get("photos", [])) > 0)
+
+    accent_color = get_color_for_alert(alert)
+    accent_hex = ACCENT_HEX.get(accent_color, "#ef4444")
+
+    type_label = _format_alert_type_natural(alert_type)
+    status_badge = ""
+    if status:
+        bg = "rgba(34,197,94,0.15)" if is_active else "rgba(107,114,128,0.15)"
+        fg = "#16a34a" if is_active else "#6b7280"
+        status_badge = f'<span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;background:{bg};color:{fg};">{status}</span>'
+    type_badge = ""
+    if type_label:
+        type_badge = f'<span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(59,130,246,0.12);color:#2563eb;">{type_label}</span>'
+    badges = " ".join(b for b in [type_badge, status_badge] if b)
+
+    photos_html = ' <span style="display:inline-flex;align-items:center;gap:4px;color:#64748b;font-size:12px;">📷 Fotos adjuntas</span>' if has_photos else ""
+
     return f"""
-    <div style="min-width: 220px; max-width: 360px; font-family: Georgia, 'Times New Roman', serif; font-size: 15px; line-height: 1.6; color: #1f2937;">
-        <p style="margin: 0 0 12px 0; font-weight: 600; font-size: 16px; color: #111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">{title}</p>
-        {f'<p style="margin: 0 0 10px 0; font-size: 13px; color: {status_color};">{meta_line}</p>' if meta_line else ''}
-        <p style="margin: 0; font-size: 14px; color: #374151;">{description}{photos_note}</p>
+    <div style="min-width:260px;max-width:380px;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+        <div style="height:4px;background:{accent_hex};"></div>
+        <div style="padding:16px 18px;">
+            <h3 style="margin:0 0 12px;font-size:15px;font-weight:700;line-height:1.35;color:#0f172a;letter-spacing:-0.02em;">{title}</h3>
+            {f'<div style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:6px;">{badges}</div>' if badges else ''}
+            <p style="margin:0;font-size:13px;line-height:1.55;color:#475569;">{description}{photos_html}</p>
+        </div>
     </div>
     """
 
@@ -211,6 +231,16 @@ def main():
         tiles="CartoDB positron",
         control_scale=True,
     )
+
+    # Estilos modernos para los popups
+    popup_css = """
+    <style>
+    .leaflet-popup-content { margin: 0; }
+    .leaflet-popup-content-wrapper { border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08); }
+    .leaflet-popup-tip { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    </style>
+    """
+    m.get_root().header.add_child(folium.Element(popup_css))
 
     # Agrupar marcadores (zoom en los círculos con números para ver los individuales)
     marker_cluster = MarkerCluster(

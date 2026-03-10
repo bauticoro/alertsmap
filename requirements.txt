@@ -1,2 +1,4 @@
 requests>=2.28.0
 folium>=0.15.0
+py-staticmaps>=0.6.0
+Pillow>=9.0.0
