@@ -233,15 +233,14 @@ def main():
         control_scale=True,
     )
 
-    # Favicon y título de Chofex (embebido como data URI para que siempre cargue)
+    # Favicon y título de Chofex (embebido porque chofex.com/favicon.png falla a veces)
     favicon_path = Path(__file__).parent / "web" / "favicon.png"
     if favicon_path.exists():
         import base64
         with open(favicon_path, "rb") as f:
-            favicon_b64 = base64.b64encode(f.read()).decode("ascii")
-        favicon_data_uri = f'data:image/png;base64,{favicon_b64}'
+            b64 = base64.b64encode(f.read()).decode("ascii")
         m.get_root().header.add_child(
-            folium.Element(f'<link rel="icon" type="image/png" href="{favicon_data_uri}">')
+            folium.Element(f'<link rel="icon" type="image/png" href="data:image/png;base64,{b64}">')
         )
     m.get_root().header.add_child(folium.Element("<title>Mapa nacional de alertas - Chofex</title>"))
 
