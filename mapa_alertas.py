@@ -229,9 +229,15 @@ def main():
         location=MEXICO_CENTER,
         zoom_start=ZOOM_START,
         tiles="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-        attr="",
+        attr="© CARTO",
         control_scale=True,
     )
+
+    # Favicon y título de Chofex (igual que chofex.com)
+    m.get_root().header.add_child(
+        folium.Element('<link rel="icon" type="image/x-icon" href="https://www.chofex.com/favicon.ico">')
+    )
+    m.get_root().header.add_child(folium.Element("<title>Mapa nacional de alertas - Chofex</title>"))
 
     # Estilos modernos para los popups
     popup_css = """
