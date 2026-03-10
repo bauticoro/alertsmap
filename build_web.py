@@ -38,6 +38,7 @@ def main():
     alertas_path = web_dir / "alertas.json"
     template_path = web_dir / "index.template.html"
     output_path = web_dir / "index.html"
+    public_output = web_dir / "public" / "index.html"
 
     if not alertas_path.exists():
         print(f"Error: No existe {alertas_path}")
@@ -45,6 +46,9 @@ def main():
         sys.exit(1)
 
     build_web(alertas_path, template_path, output_path)
+    if public_output.parent.exists():
+        build_web(alertas_path, template_path, public_output)
+        print(f"Build OK: {public_output}")
 
 
 if __name__ == "__main__":

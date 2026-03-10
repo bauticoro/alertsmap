@@ -1,4 +1,2 @@
-# No desplegar alertas.json: los datos van embebidos en index.html
-alertas.json
-# Plantilla, no el HTML final
+# Plantilla, no el HTML final (el build genera index.html)
 index.template.html
