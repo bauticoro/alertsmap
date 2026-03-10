@@ -20,7 +20,9 @@ Cuando pregunte por el Root Directory, indica `web`.
 
 ## Actualizar datos
 
-Cada vez que ejecutes el scraper y generes el mapa:
+**Automático (droplet):** Si configuraste `GITHUB_TOKEN` en el droplet, cada ciclo del monitor sube `alertas.json` a GitHub. Vercel detecta el push y despliega automáticamente.
+
+**Manual:** Cada vez que ejecutes el scraper y generes el mapa:
 
 ```bash
 python3 scrape_aliado_mexico.py

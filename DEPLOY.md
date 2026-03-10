@@ -32,6 +32,13 @@ cd scraper-aliado
 
 *(Si el repo es privado, configura SSH keys o un token.)*
 
+Si vas a usar `GITHUB_TOKEN` para que el droplet suba las alertas automáticamente, configura git para los commits:
+
+```bash
+git config user.email "tu-email@ejemplo.com"
+git config user.name "Tu Nombre"
+```
+
 ### 5. Crear entorno virtual e instalar dependencias
 
 ```bash
@@ -52,7 +59,12 @@ Edita `.env` con tus valores:
 ```
 WHAPI_TOKEN=tu_token_de_whapi
 WHAPI_GROUP_ID=120363423858096188@g.us
+
+# Opcional: para que el droplet suba web/alertas.json a GitHub (la página se actualizará)
+GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
+
+**GITHUB_TOKEN** (opcional): Si lo configuras, cada vez que el scraper termine, el droplet hará `git push` de `web/alertas.json` a tu repo. Así Vercel/GitHub Pages desplegará automáticamente y la página del mapa siempre mostrará las alertas más recientes. Crear el token en: GitHub → Settings → Developer settings → Personal access tokens (permiso `repo`).
 
 ### 7. Configurar cron (cada 5 minutos)
 
