@@ -9,6 +9,9 @@ venv/
 .env
 .env.local
 
+# Estado del monitor (IDs ya enviados)
+output/sent_alert_ids.json
+
 # IDE
 .idea/
 .vscode/

@@ -13,7 +13,9 @@ from pathlib import Path
 from typing import Optional, Tuple, Union
 
 import staticmaps
-from staticmaps import tile_provider
+from dotenv import load_dotenv
+
+load_dotenv()
 
 WHAPI_BASE_URL = "https://gate.whapi.cloud"
 GROUP_ID = os.environ.get("WHAPI_GROUP_ID", "")
@@ -21,7 +23,7 @@ TOKEN = os.environ.get("WHAPI_TOKEN", "")
 
 MAP_WIDTH = 640
 MAP_HEIGHT = 480
-MAP_ZOOM = 15
+MAP_ZOOM = 8
 
 
 def format_alert(alert: dict) -> str:
@@ -46,7 +48,7 @@ def get_alert_location(alert: dict) -> Optional[Tuple[float, float]]:
 def generate_map_image(lat: float, lon: float) -> bytes:
     """Genera una imagen PNG del mapa con un marcador en la ubicación indicada."""
     context = staticmaps.Context()
-    context.set_tile_provider(tile_provider.tile_provider_OSM)
+    context.set_tile_provider(staticmaps.tile_provider_OSM)
     point = staticmaps.create_latlng(lat, lon)
     context.add_object(staticmaps.Marker(point, color=staticmaps.RED, size=14))
     context.set_zoom(MAP_ZOOM)
@@ -76,6 +78,17 @@ def send_image_with_caption(image_bytes: bytes, caption: str) -> dict:
     response = requests.post(url, json=payload, headers=headers)
     response.raise_for_status()
     return response.json()
+
+
+def send_single_alert(alert: dict) -> dict:
+    """Envía una alerta específica al grupo con mapa GPS (si tiene ubicación)."""
+    mensaje = format_alert(alert)
+    location = get_alert_location(alert)
+    if location:
+        lat, lon = location
+        map_image = generate_map_image(lat, lon)
+        return send_image_with_caption(map_image, mensaje)
+    return send_message(mensaje)
 
 
 def send_alert(alertas_path: Optional[Union[str, Path]] = None) -> dict:
