@@ -235,7 +235,7 @@ def main():
 
     # Favicon y título de Chofex (igual que chofex.com)
     m.get_root().header.add_child(
-        folium.Element('<link rel="icon" type="image/x-icon" href="https://www.chofex.com/favicon.ico">')
+        folium.Element('<link rel="icon" type="image/png" href="https://www.chofex.com/favicon.png">')
     )
     m.get_root().header.add_child(folium.Element("<title>Mapa nacional de alertas - Chofex</title>"))
 

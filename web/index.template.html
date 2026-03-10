@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <link rel="icon" type="image/x-icon" href="https://www.chofex.com/favicon.ico">
+  <link rel="icon" type="image/png" href="favicon.png">
   <title>Mapa nacional de alertas - Chofex</title>
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-QDD6CP6HX6"></script>
@@ -11,7 +11,11 @@
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
-    gtag('config', 'G-QDD6CP6HX6');
+    gtag('config', 'G-QDD6CP6HX6', {
+      send_page_view: true,
+      page_title: document.title,
+      page_location: window.location.href
+    });
   </script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.css"/>
@@ -367,6 +371,9 @@
       map.addLayer(clusterActive);
       if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] });
       document.getElementById('loading').classList.add('hidden');
+      if (typeof gtag === 'function') {
+        gtag('event', 'map_loaded', { event_category: 'engagement', alert_count: valid.length });
+      }
     }
 
     init();
