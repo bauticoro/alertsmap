@@ -242,7 +242,7 @@ def main():
         m.get_root().header.add_child(
             folium.Element(f'<link rel="icon" type="image/png" href="data:image/png;base64,{b64}">')
         )
-    m.get_root().header.add_child(folium.Element("<title>Mapa nacional de alertas - Chofex</title>"))
+    m.get_root().header.add_child(folium.Element("<title>Chofex · Mapa de alertas</title>"))
 
     # Estilos modernos para los popups
     popup_css = """
@@ -281,6 +281,22 @@ def main():
 
     # Añadir control de capas
     folium.LayerControl().add_to(m)
+
+    # Ocultar tooltip al abrir popup (evitar que se muestren ambos al hacer click)
+    map_name = m.get_name()
+    close_tooltip_script = f"""
+(function() {{
+  var map = {map_name};
+  if (map) {{
+    map.on('popupopen', function(e) {{
+      if (e.popup && e.popup._source && typeof e.popup._source.closeTooltip === 'function') {{
+        e.popup._source.closeTooltip();
+      }}
+    }});
+  }}
+}})();
+"""
+    m.get_root().script.add_child(folium.Element(close_tooltip_script))
 
     # Guardar mapa
     output_dir = Path(__file__).parent / "output"
