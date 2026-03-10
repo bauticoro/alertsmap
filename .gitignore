@@ -12,6 +12,9 @@ venv/
 # Estado del monitor (IDs ya enviados)
 output/sent_alert_ids.json
 
+# Timestamp para intervalos aleatorios del cron
+.last_run_aliado
+
 # Caché de tiles para mapas
 .cache/
 

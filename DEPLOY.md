@@ -66,10 +66,21 @@ GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 **GITHUB_TOKEN** (opcional): Si lo configuras, cada vez que el scraper termine, el droplet hará `git push` de `web/alertas.json` a tu repo. Así Vercel/GitHub Pages desplegará automáticamente y la página del mapa siempre mostrará las alertas más recientes. Crear el token en: GitHub → Settings → Developer settings → Personal access tokens (permiso `repo`).
 
-### 7. Configurar cron (cada 5 minutos)
+### 7. Configurar cron (horario natural + intervalos aleatorios)
+
+El script configura un cron que trabaja más en horario laboral, descansa de noche, y usa **intervalos aleatorios** para parecer más natural:
+
+| Horario | Intervalo (random) |
+|---------|---------------------|
+| 9:00–18:00 (laboral) | 4–8 min |
+| 7:00–9:00 y 19:00–22:00 | 12–18 min |
+| 22:00–7:00 (madrugada) | 25–35 min |
+
+El cron corre cada minuto; un wrapper decide si ejecutar según el intervalo aleatorio del período.
 
 ```bash
 chmod +x scripts/run_cycle.sh
+chmod +x scripts/run_cycle_random.sh
 chmod +x scripts/setup_cron.sh
 ./scripts/setup_cron.sh
 ```
@@ -80,16 +91,17 @@ El log se guarda en `aliado_scraper.log` dentro del proyecto. Para usar `/var/lo
 LOG_FILE=/var/log/aliado_scraper.log ./scripts/setup_cron.sh
 ```
 
-O manualmente:
+Para otra zona horaria (por defecto CDMX):
 
 ```bash
-crontab -e
+TZ=America/Santiago LOG_FILE=/var/log/aliado_scraper.log ./scripts/setup_cron.sh
 ```
 
-Añade esta línea (ajusta la ruta si clonaste en otro sitio):
+O manualmente con `crontab -e`:
 
 ```
-*/5 * * * * cd /opt/scraper-aliado && ./scripts/run_cycle.sh >> /opt/scraper-aliado/aliado_scraper.log 2>&1
+TZ=America/Mexico_City
+* * * * * cd /opt/scraper-aliado && ./scripts/run_cycle_random.sh >> /opt/scraper-aliado/aliado_scraper.log 2>&1
 ```
 
 ### 8. Probar manualmente
@@ -119,14 +131,18 @@ cd /opt/scraper-aliado
 docker build -t scraper-aliado .
 ```
 
-Para ejecutar con cron cada 5 minutos:
+Para ejecutar con cron (horario natural + intervalos aleatorios, ver tabla arriba):
 
-```bash
-crontab -e
+**Con venv en el host:**
+```
+TZ=America/Mexico_City
+* * * * * cd /opt/scraper-aliado && ./scripts/run_cycle_random.sh >> /var/log/aliado.log 2>&1
 ```
 
+**Solo Docker** (sin venv en el host, reemplaza `RUN_CMD`):
 ```
-*/5 * * * * docker run --rm -e WHAPI_TOKEN=tu_token -e WHAPI_GROUP_ID=tu_grupo -v $(pwd)/output:/app/output scraper-aliado python monitor_alertas.py --once >> /var/log/aliado.log 2>&1
+TZ=America/Mexico_City
+* * * * * cd /opt/scraper-aliado && RUN_CMD='docker run --rm -e WHAPI_TOKEN=xxx -e WHAPI_GROUP_ID=xxx -v /opt/scraper-aliado/output:/app/output scraper-aliado python monitor_alertas.py --once' ./scripts/run_cycle_random.sh >> /var/log/aliado.log 2>&1
 ```
 
 *(Nota: el volumen `output` persiste los JSON y `sent_alert_ids.json` entre ejecuciones.)*
