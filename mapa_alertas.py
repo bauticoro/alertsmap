@@ -233,10 +233,16 @@ def main():
         control_scale=True,
     )
 
-    # Favicon y título de Chofex (igual que chofex.com)
-    m.get_root().header.add_child(
-        folium.Element('<link rel="icon" type="image/png" href="https://www.chofex.com/favicon.png">')
-    )
+    # Favicon y título de Chofex (embebido como data URI para que siempre cargue)
+    favicon_path = Path(__file__).parent / "web" / "favicon.png"
+    if favicon_path.exists():
+        import base64
+        with open(favicon_path, "rb") as f:
+            favicon_b64 = base64.b64encode(f.read()).decode("ascii")
+        favicon_data_uri = f'data:image/png;base64,{favicon_b64}'
+        m.get_root().header.add_child(
+            folium.Element(f'<link rel="icon" type="image/png" href="{favicon_data_uri}">')
+        )
     m.get_root().header.add_child(folium.Element("<title>Mapa nacional de alertas - Chofex</title>"))
 
     # Estilos modernos para los popups
