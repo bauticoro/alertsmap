@@ -1,5 +1,7 @@
 {
-  "buildCommand": null,
-  "outputDirectory": ".",
-  "framework": null
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "builds": [
+    { "src": "*.html", "use": "@vercel/static" },
+    { "src": "*.json", "use": "@vercel/static" }
+  ]
 }
