@@ -12,6 +12,9 @@ venv/
 # Estado del monitor (IDs ya enviados)
 output/sent_alert_ids.json
 
+# Caché de tiles para mapas
+.cache/
+
 # IDE
 .idea/
 .vscode/

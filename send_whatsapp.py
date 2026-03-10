@@ -13,6 +13,7 @@ from typing import Optional, Tuple, Union
 
 import staticmaps
 from dotenv import load_dotenv
+from PIL import Image, ImageDraw, ImageFont
 
 load_dotenv()
 
@@ -23,6 +24,32 @@ TOKEN = os.environ.get("WHAPI_TOKEN", "")
 MAP_WIDTH = 640
 MAP_HEIGHT = 480
 MAP_ZOOM = 8
+
+# Tile provider OSM sin atribución (reemplazamos por branding Chofex)
+TILE_PROVIDER_OSM_NO_ATTRIBUTION = staticmaps.TileProvider(
+    "osm",
+    url_pattern="https://$s.tile.openstreetmap.org/$z/$x/$y.png",
+    shards=["a", "b", "c"],
+    attribution=None,
+    max_zoom=19,
+)
+
+CHOFEX_LOGO_URL = "https://www.chofex.com/assets/logo-chofex-color-O6e_H_to.png"
+_logo_cache: Optional[bytes] = None
+
+
+def _get_chofex_logo() -> Optional[bytes]:
+    """Obtiene el logo de Chofex (cache en memoria)."""
+    global _logo_cache
+    if _logo_cache is not None:
+        return _logo_cache
+    try:
+        resp = requests.get(CHOFEX_LOGO_URL, timeout=10)
+        resp.raise_for_status()
+        _logo_cache = resp.content
+        return _logo_cache
+    except Exception:
+        return None
 
 
 def format_alert(alert: dict) -> str:
@@ -44,15 +71,68 @@ def get_alert_location(alert: dict) -> Optional[Tuple[float, float]]:
     return (float(lat), float(lon))
 
 
+def _add_chofex_overlay(image: Image.Image) -> Image.Image:
+    """Añade logo y texto 'Alerta reportada por Chofex' en la esquina inferior del mapa."""
+    w, h = image.size
+    img_rgba = image.convert("RGBA")
+
+    # Barra inferior semi-transparente
+    overlay_height = 44
+    overlay = Image.new("RGBA", image.size, (255, 255, 255, 0))
+    overlay_draw = ImageDraw.Draw(overlay)
+    overlay_draw.rectangle(
+        [(0, h - overlay_height), (w, h)],
+        fill=(255, 255, 255, 230),
+    )
+    img_rgba = Image.alpha_composite(img_rgba, overlay)
+
+    # Logo Chofex
+    logo_bytes = _get_chofex_logo()
+    if logo_bytes:
+        try:
+            logo_img = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
+            logo_h = 28
+            logo_w = int(logo_img.width * logo_h / logo_img.height)
+            logo_img = logo_img.resize((logo_w, logo_h), Image.LANCZOS)
+            x_logo = 8
+            y_logo = h - overlay_height + (overlay_height - logo_h) // 2
+            img_rgba.paste(logo_img, (x_logo, y_logo), logo_img)
+        except Exception:
+            pass
+
+    # Texto "Alerta reportada por Chofex"
+    draw = ImageDraw.Draw(img_rgba)
+    text = "Alerta reportada por Chofex"
+    try:
+        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 12)
+    except OSError:
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
+        except OSError:
+            font = ImageFont.load_default()
+    text_bbox = draw.textbbox((0, 0), text, font=font)
+    text_w = text_bbox[2] - text_bbox[0]
+    x_text = w - text_w - 12
+    y_text = h - overlay_height + (overlay_height - (text_bbox[3] - text_bbox[1])) // 2
+    draw.text((x_text, y_text), text, fill=(0, 0, 0, 255), font=font)
+
+    return img_rgba.convert("RGB")
+
+
 def generate_map_image(lat: float, lon: float) -> bytes:
-    """Genera una imagen PNG del mapa con un marcador en la ubicación indicada."""
+    """Genera una imagen PNG del mapa con un marcador en la ubicación indicada.
+    Sin atribución OpenStreetMap; incluye branding Chofex (logo + texto).
+    """
     context = staticmaps.Context()
-    context.set_tile_provider(staticmaps.tile_provider_OSM)
+    context.set_tile_provider(TILE_PROVIDER_OSM_NO_ATTRIBUTION)
+    cache_dir = str(Path(__file__).parent / ".cache" / "tiles")
+    context.set_cache_dir(cache_dir)
     point = staticmaps.create_latlng(lat, lon)
     context.add_object(staticmaps.Marker(point, color=staticmaps.RED, size=14))
     context.set_zoom(MAP_ZOOM)
     context.set_center(point)
     image = context.render_pillow(MAP_WIDTH, MAP_HEIGHT)
+    image = _add_chofex_overlay(image.convert("RGBA"))
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
     return buffer.getvalue()
