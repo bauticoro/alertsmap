@@ -134,6 +134,20 @@
     }
     .branding-frame a:hover { opacity: 0.9; }
     #map { bottom: 0; }
+    /* Clusters de alertas inactivas (gris) */
+    .marker-cluster-inactive.marker-cluster-small { background-color: rgba(156, 163, 175, 0.5); }
+    .marker-cluster-inactive.marker-cluster-small div { background-color: rgba(107, 114, 128, 0.7); }
+    .marker-cluster-inactive.marker-cluster-medium { background-color: rgba(156, 163, 175, 0.5); }
+    .marker-cluster-inactive.marker-cluster-medium div { background-color: rgba(107, 114, 128, 0.7); }
+    .marker-cluster-inactive.marker-cluster-large { background-color: rgba(156, 163, 175, 0.5); }
+    .marker-cluster-inactive.marker-cluster-large div { background-color: rgba(107, 114, 128, 0.7); }
+    /* Clusters de alertas activas (color) */
+    .marker-cluster-active.marker-cluster-small { background-color: rgba(147, 197, 253, 0.6); }
+    .marker-cluster-active.marker-cluster-small div { background-color: rgba(59, 130, 246, 0.8); }
+    .marker-cluster-active.marker-cluster-medium { background-color: rgba(253, 186, 116, 0.6); }
+    .marker-cluster-active.marker-cluster-medium div { background-color: rgba(249, 115, 22, 0.8); }
+    .marker-cluster-active.marker-cluster-large { background-color: rgba(252, 165, 165, 0.6); }
+    .marker-cluster-active.marker-cluster-large div { background-color: rgba(239, 68, 68, 0.8); }
   </style>
 </head>
 <body>
@@ -156,6 +170,10 @@
   <script>
     const ALERT_COLORS = { default: 'red', incendio: 'orange', inundación: 'blue', sismo: 'purple', accidente: 'darkred', seguridad: 'darkblue' };
 
+    function isActiveAlert(alert) {
+      return (alert.status || '').toUpperCase() === 'ACTIVE';
+    }
+
     function getColor(alert) {
       const status = (alert.status || '').toUpperCase();
       if (status === 'PAST') return 'gray';
@@ -165,6 +183,20 @@
         if (key !== 'default' && type.includes(key)) return color;
       }
       return ALERT_COLORS.default;
+    }
+
+    function createClusterIcon(className) {
+      return function(cluster) {
+        const count = cluster.getChildCount();
+        let sizeClass = 'marker-cluster-small';
+        if (count >= 100) sizeClass = 'marker-cluster-large';
+        else if (count >= 10) sizeClass = 'marker-cluster-medium';
+        return L.divIcon({
+          html: '<div><span>' + count + '</span></div>',
+          className: 'marker-cluster ' + className + ' ' + sizeClass,
+          iconSize: L.point(40, 40)
+        });
+      };
     }
 
     function escapeHtml(text) {
@@ -254,10 +286,22 @@
         return;
       }
 
-      const cluster = L.markerClusterGroup({ maxClusterRadius: 80, spiderfyOnMaxZoom: true });
+      const activeAlerts = valid.filter(a => isActiveAlert(a));
+      const inactiveAlerts = valid.filter(a => !isActiveAlert(a));
+
+      const clusterActive = L.markerClusterGroup({
+        maxClusterRadius: 80,
+        spiderfyOnMaxZoom: true,
+        iconCreateFunction: createClusterIcon('marker-cluster-active')
+      });
+      const clusterInactive = L.markerClusterGroup({
+        maxClusterRadius: 80,
+        spiderfyOnMaxZoom: true,
+        iconCreateFunction: createClusterIcon('marker-cluster-inactive')
+      });
       const bounds = [];
 
-      valid.forEach(alert => {
+      function addMarker(alert, cluster) {
         const lat = parseFloat(alert.latlon.lat);
         const lon = parseFloat(alert.latlon.lon);
         bounds.push([lat, lon]);
@@ -272,9 +316,13 @@
         marker.bindPopup(popupHtml(alert), { maxWidth: 400 });
         marker.bindTooltip(alert.title || 'Ver detalles');
         cluster.addLayer(marker);
-      });
+      }
 
-      map.addLayer(cluster);
+      activeAlerts.forEach(alert => addMarker(alert, clusterActive));
+      inactiveAlerts.forEach(alert => addMarker(alert, clusterInactive));
+
+      map.addLayer(clusterInactive);
+      map.addLayer(clusterActive);
       if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] });
       document.getElementById('loading').classList.add('hidden');
     }
