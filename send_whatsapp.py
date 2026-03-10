@@ -37,6 +37,7 @@ TILE_PROVIDER_OSM_NO_ATTRIBUTION = staticmaps.TileProvider(
 )
 
 CHOFEX_LOGO_URL = "https://www.chofex.com/assets/logo-chofex-color-O6e_H_to.png"
+MAPA_ALERTAS_URL = "https://mapadealertas.chofex.com/"
 _logo_cache: Optional[bytes] = None
 
 
@@ -52,6 +53,13 @@ def _get_chofex_logo() -> Optional[bytes]:
         return _logo_cache
     except Exception:
         return None
+
+
+def _append_map_link(text: str) -> str:
+    """Añade el link al mapa de alertas al final del mensaje."""
+    if not text.strip():
+        return text
+    return f"{text.strip()}\n\n📍 Mapa: {MAPA_ALERTAS_URL}"
 
 
 def format_alert(alert: dict) -> str:
@@ -192,7 +200,7 @@ def send_single_alert(alert: dict) -> dict:
     Si el envío de imagen falla (ej. 404), envía solo el texto como fallback.
     El texto se parafrasea con OpenAI antes de enviar.
     """
-    mensaje = paraphrase_text(format_alert(alert))
+    mensaje = _append_map_link(paraphrase_text(format_alert(alert)))
     location = get_alert_location(alert)
     if location:
         try:
@@ -220,7 +228,7 @@ def send_alert(alertas_path: Optional[Union[str, Path]] = None) -> dict:
     if not alertas_con_ubicacion:
         alertas_con_ubicacion = alertas  # fallback: enviar sin mapa
     alerta = random.choice(alertas_con_ubicacion)
-    mensaje = paraphrase_text(format_alert(alerta))
+    mensaje = _append_map_link(paraphrase_text(format_alert(alerta)))
     location = get_alert_location(alerta)
     if location:
         try:
