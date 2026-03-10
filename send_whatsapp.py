@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Optional, Tuple, Union
 
 import staticmaps
+from openai import OpenAI
 from dotenv import load_dotenv
 from PIL import Image, ImageDraw, ImageFont
 
@@ -20,6 +21,7 @@ load_dotenv()
 WHAPI_BASE_URL = os.environ.get("WHAPI_BASE_URL", "https://gate.whapi.cloud").rstrip("/")
 GROUP_ID = os.environ.get("WHAPI_GROUP_ID", "")
 TOKEN = os.environ.get("WHAPI_TOKEN", "")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 MAP_WIDTH = 640
 MAP_HEIGHT = 480
@@ -57,6 +59,38 @@ def format_alert(alert: dict) -> str:
     title = alert.get("title", "Alerta")
     description = alert.get("description", "")
     return f"{title}\n\n{description}".strip()
+
+
+def paraphrase_text(text: str) -> str:
+    """Parafrasea el texto usando OpenAI para que no sea idéntico al original.
+    Mantiene el significado, emojis y estructura. Si falla o no hay API key, devuelve el original.
+    """
+    if not text.strip():
+        return text
+    if not OPENAI_API_KEY:
+        return text
+    try:
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Eres un reescritor de textos. Parafrasea el mensaje que recibes manteniendo "
+                        "exactamente el mismo significado e información (ubicaciones, distancias, consejos). "
+                        "Usa palabras y estructuras diferentes. Conserva los emojis y el formato de saltos "
+                        "de línea. Responde ÚNICAMENTE con el texto parafraseado, sin explicaciones."
+                    ),
+                },
+                {"role": "user", "content": text},
+            ],
+            temperature=0.7,
+        )
+        result = response.choices[0].message.content.strip()
+        return result if result else text
+    except Exception:
+        return text
 
 
 def get_alert_location(alert: dict) -> Optional[Tuple[float, float]]:
@@ -156,8 +190,9 @@ def send_image_with_caption(image_bytes: bytes, caption: str) -> dict:
 def send_single_alert(alert: dict) -> dict:
     """Envía una alerta específica al grupo con mapa GPS (si tiene ubicación).
     Si el envío de imagen falla (ej. 404), envía solo el texto como fallback.
+    El texto se parafrasea con OpenAI antes de enviar.
     """
-    mensaje = format_alert(alert)
+    mensaje = paraphrase_text(format_alert(alert))
     location = get_alert_location(alert)
     if location:
         try:
@@ -185,7 +220,7 @@ def send_alert(alertas_path: Optional[Union[str, Path]] = None) -> dict:
     if not alertas_con_ubicacion:
         alertas_con_ubicacion = alertas  # fallback: enviar sin mapa
     alerta = random.choice(alertas_con_ubicacion)
-    mensaje = format_alert(alerta)
+    mensaje = paraphrase_text(format_alert(alerta))
     location = get_alert_location(alerta)
     if location:
         try:
