@@ -1,0 +1,26 @@
+[
+  {
+    "id": "1",
+    "title": "Alerta de prueba - CDMX",
+    "description": "Ejemplo de alerta en la Ciudad de México para probar el mapa.",
+    "latlon": {"lat": 19.4326, "lon": -99.1332},
+    "status": "activa",
+    "alertType": {"id": "1", "name": "Incendio"}
+  },
+  {
+    "id": "2",
+    "title": "Alerta de prueba - Guadalajara",
+    "description": "Ejemplo de alerta en Guadalajara.",
+    "latlon": {"lat": 20.6597, "lon": -103.3496},
+    "status": "activa",
+    "alertType": {"id": "2", "name": "Inundación"}
+  },
+  {
+    "id": "3",
+    "title": "Alerta de prueba - Monterrey",
+    "description": "Ejemplo de alerta en Monterrey.",
+    "latlon": {"lat": 25.6866, "lon": -100.3161},
+    "status": "resuelta",
+    "alertType": {"id": "3", "name": "Accidente"}
+  }
+]
