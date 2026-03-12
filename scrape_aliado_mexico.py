@@ -253,6 +253,17 @@ def main():
 
     output_dir = Path(__file__).parent / "output"
     output_dir.mkdir(exist_ok=True)
+
+    # Añadir región a cada alerta
+    try:
+        from regiones_mexico import identificar_region
+        for a in all_alerts:
+            info = identificar_region(a, use_reverse_geocode=False)
+            a["region"] = info["region"]
+            a["estado"] = info.get("estado")
+    except ImportError:
+        pass
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = output_dir / f"alertas_mexico_{timestamp}.json"
     with open(output_file, "w", encoding="utf-8") as f:

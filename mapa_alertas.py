@@ -146,6 +146,7 @@ def create_popup_html(alert: dict) -> str:
     status = _format_status_natural(alert.get("status") or "")
     is_active = (alert.get("status") or "").upper() == "ACTIVE"
     has_photos = bool(alert.get("photos") and len(alert.get("photos", [])) > 0)
+    region = alert.get("region")
 
     accent_color = get_color_for_alert(alert)
     accent_hex = ACCENT_HEX.get(accent_color, "#ef4444")
@@ -159,7 +160,11 @@ def create_popup_html(alert: dict) -> str:
     type_badge = ""
     if type_label:
         type_badge = f'<span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(59,130,246,0.12);color:#2563eb;">{type_label}</span>'
-    badges = " ".join(b for b in [type_badge, status_badge] if b)
+    region_badge = ""
+    if region and region != "Desconocida" and "no aplica" not in region.lower():
+        region_esc = _escape_html(region)
+        region_badge = f'<span style="display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(139,92,246,0.12);color:#7c3aed;">📍 {region_esc}</span>'
+    badges = " ".join(b for b in [type_badge, status_badge, region_badge] if b)
 
     photos_html = ' <span style="display:inline-flex;align-items:center;gap:4px;color:#64748b;font-size:12px;">📷 Fotos adjuntas</span>' if has_photos else ""
 
@@ -187,7 +192,7 @@ def find_latest_alerts_file() -> Optional[Path]:
     output_dir = Path(__file__).parent / "output"
     if not output_dir.exists():
         return None
-    files = list(output_dir.glob("alertas_mexico_*.json"))
+    files = [p for p in output_dir.glob("alertas_mexico_*.json") if "_con_regiones" not in p.name]
     if not files:
         return None
     return max(files, key=lambda p: p.stat().st_mtime)
@@ -208,6 +213,17 @@ def main():
 
     print(f"Cargando alertas desde: {json_path}")
     alerts = load_alerts(json_path)
+
+    # Añadir región si no está presente
+    if alerts and "region" not in alerts[0]:
+        try:
+            from regiones_mexico import identificar_region
+            for a in alerts:
+                info = identificar_region(a, use_reverse_geocode=False)
+                a["region"] = info["region"]
+                a["estado"] = info.get("estado")
+        except ImportError:
+            pass
 
     # Filtrar alertas con coordenadas válidas
     valid_alerts = [

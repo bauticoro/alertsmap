@@ -151,7 +151,7 @@ def run_scraper() -> bool:
 
 def get_latest_alerts() -> list:
     """Obtiene las alertas del archivo JSON más reciente."""
-    files = list(OUTPUT_DIR.glob("alertas_mexico_*.json"))
+    files = [p for p in OUTPUT_DIR.glob("alertas_mexico_*.json") if "_con_regiones" not in p.name]
     if not files:
         return []
     latest = max(files, key=lambda p: p.stat().st_mtime)
@@ -206,7 +206,7 @@ def run_cycle() -> int:
 
     print(f"   {len(nuevas)} alerta(s) nueva(s) activa(s) detectada(s)")
 
-    # 3. Enviar cada alerta nueva en un mensaje separado
+    # 3. Enviar cada alerta nueva a Todas las regiones + grupo de su región (si aplica)
     enviadas = 0
     for i, alerta in enumerate(nuevas, 1):
         try:
@@ -214,8 +214,10 @@ def run_cycle() -> int:
             sent_ids.add(alerta["id"])
             save_sent_ids(sent_ids)
             enviadas += 1
+            region = alerta.get("region", "?")
             titulo = (alerta.get("title") or "Sin título")[:50]
-            print(f"   ✅ [{i}/{len(nuevas)}] Enviada: {titulo}...")
+            grupos = "Todas + " + region if region and region != "Desconocida" and "no aplica" not in (region or "").lower() else "Todas"
+            print(f"   ✅ [{i}/{len(nuevas)}] Enviada a {grupos}: {titulo}...")
             # Pequeña pausa entre mensajes para evitar rate limits
             if i < len(nuevas):
                 time.sleep(2)

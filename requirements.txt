@@ -5,3 +5,4 @@ curl_cffi>=0.6.0
 folium>=0.15.0
 py-staticmaps>=0.4.0
 Pillow>=9.0.0,<10.0.0
+reverse-geocode>=1.6.0
