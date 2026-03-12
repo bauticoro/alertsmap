@@ -17,6 +17,7 @@ COPY scrape_aliado_mexico.py .
 COPY mapa_alertas.py .
 COPY monitor_alertas.py .
 COPY send_whatsapp.py .
+COPY regiones_mexico.py .
 
 RUN mkdir -p output
 
