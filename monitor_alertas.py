@@ -149,6 +149,31 @@ def run_scraper() -> bool:
     return True
 
 
+def run_analisis_lecturas() -> None:
+    """
+    Ejecuta el script de análisis de lecturas tras haber enviado alertas.
+    Genera web/estadisticas_grupo.json y lo sube a GitHub.
+    """
+    script = SCRIPT_DIR / "analizar_lecturas_grupo.py"
+    if not script.exists():
+        return
+    print("   📊 Analizando lecturas de los grupos...")
+    try:
+        result = subprocess.run(
+            [sys.executable, str(script)],
+            cwd=str(SCRIPT_DIR),
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        if result.returncode != 0:
+            print(f"   ⚠️ Análisis de lecturas falló: {(result.stderr or result.stdout or '')[:150]}")
+    except subprocess.TimeoutExpired:
+        print("   ⚠️ Timeout en análisis de lecturas")
+    except Exception as e:
+        print(f"   ⚠️ Error en análisis de lecturas: {e}")
+
+
 def get_latest_alerts() -> list:
     """Obtiene las alertas del archivo JSON más reciente."""
     files = [p for p in OUTPUT_DIR.glob("alertas_mexico_*.json") if "_con_regiones" not in p.name]
@@ -223,6 +248,9 @@ def run_cycle() -> int:
                 time.sleep(2)
         except Exception as e:
             print(f"   ❌ Error enviando alerta {alerta.get('id')}: {e}")
+
+    # 4. Tras enviar alertas: analizar lecturas y subir estadísticas a GitHub
+    run_analisis_lecturas()
 
     return enviadas
 
