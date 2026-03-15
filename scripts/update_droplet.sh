@@ -13,6 +13,9 @@ echo "🔄 Actualizando Scraper de Aliado en $(pwd)..."
 git fetch origin
 git pull origin main
 
+# Asegurar permisos de ejecución en scripts (git puede perderlos)
+chmod +x scripts/run_cycle_random.sh scripts/run_cycle.sh scripts/setup_cron.sh
+
 # Actualizar dependencias Python
 if [ -f venv/bin/pip ]; then
   echo "📦 Actualizando dependencias Python..."

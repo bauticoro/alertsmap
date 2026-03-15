@@ -23,6 +23,7 @@ SCRIPT_DIR = Path(__file__).parent
 OUTPUT_DIR = SCRIPT_DIR / "output"
 SENT_IDS_FILE = OUTPUT_DIR / "sent_alert_ids.json"
 WEB_ALERTAS_JSON = SCRIPT_DIR / "web" / "alertas.json"
+WEB_STATS_JSON = SCRIPT_DIR / "web" / "estadisticas_grupo.json"
 INTERVAL_SECONDS = 5 * 60  # 5 minutos
 
 
@@ -47,7 +48,7 @@ def save_sent_ids(ids: set) -> None:
 
 def push_to_github() -> bool:
     """
-    Sube web/alertas.json a GitHub para que la página (Vercel) se actualice.
+    Sube web/alertas.json y web/estadisticas_grupo.json a GitHub.
     Requiere GITHUB_TOKEN en .env. Si no está configurado, retorna True (no falla).
     """
     token = os.environ.get("GITHUB_TOKEN")
@@ -56,14 +57,19 @@ def push_to_github() -> bool:
 
     if not (SCRIPT_DIR / ".git").exists():
         return True  # No es un repo git
-    if not WEB_ALERTAS_JSON.exists():
-        print("   ⚠️ web/alertas.json no existe (mapa_alertas.py no lo generó)")
+
+    # Archivos a subir (solo los que existen)
+    files_to_push = [WEB_ALERTAS_JSON]
+    if WEB_STATS_JSON.exists():
+        files_to_push.append(WEB_STATS_JSON)
+
+    if not files_to_push:
         return True
 
     try:
-        # Verificar si hay cambios
+        # Verificar si hay cambios en alguno de los archivos
         r = subprocess.run(
-            ["git", "status", "--porcelain", str(WEB_ALERTAS_JSON)],
+            ["git", "status", "--porcelain"] + [str(f) for f in files_to_push],
             cwd=str(SCRIPT_DIR),
             capture_output=True,
             text=True,
@@ -80,8 +86,8 @@ def push_to_github() -> bool:
             text=True,
             timeout=5,
         )
-        if remote.returncode == 0 and "x-access-token" not in remote.stdout and token not in remote.stdout:
-            url = remote.stdout.strip()
+        if remote.returncode == 0 and "x-access-token" not in (remote.stdout or "") and token not in (remote.stdout or ""):
+            url = (remote.stdout or "").strip()
             if url.startswith("https://github.com/"):
                 url = url.replace("https://", f"https://x-access-token:{token}@", 1)
             elif url.startswith("http://github.com/"):
@@ -93,15 +99,16 @@ def push_to_github() -> bool:
                 timeout=5,
             )
 
-        subprocess.run(
-            ["git", "add", str(WEB_ALERTAS_JSON)],
-            cwd=str(SCRIPT_DIR),
-            capture_output=True,
-            check=True,
-            timeout=5,
-        )
+        for f in files_to_push:
+            subprocess.run(
+                ["git", "add", str(f)],
+                cwd=str(SCRIPT_DIR),
+                capture_output=True,
+                check=True,
+                timeout=5,
+            )
         commit = subprocess.run(
-            ["git", "commit", "-m", "chore: actualizar alertas desde droplet"],
+            ["git", "commit", "-m", "chore: actualizar alertas y estadísticas desde droplet"],
             cwd=str(SCRIPT_DIR),
             capture_output=True,
             text=True,
@@ -118,7 +125,7 @@ def push_to_github() -> bool:
             timeout=30,
         )
         if result.returncode == 0:
-            print("   ✅ Alertas subidas a GitHub (página se actualizará)")
+            print("   ✅ Alertas y estadísticas subidas a GitHub (página se actualizará)")
         else:
             print(f"   ⚠️ Git push falló: {(result.stderr or result.stdout or '')[:200]}")
         return True  # No fallar el ciclo por esto
@@ -152,7 +159,7 @@ def run_scraper() -> bool:
 def run_analisis_lecturas() -> None:
     """
     Ejecuta el script de análisis de lecturas tras haber enviado alertas.
-    Genera web/estadisticas_grupo.json y lo sube a GitHub.
+    Genera web/estadisticas_grupo.json. El push a GitHub lo hace push_to_github().
     """
     script = SCRIPT_DIR / "analizar_lecturas_grupo.py"
     if not script.exists():
@@ -160,7 +167,7 @@ def run_analisis_lecturas() -> None:
     print("   📊 Analizando lecturas de los grupos...")
     try:
         result = subprocess.run(
-            [sys.executable, str(script)],
+            [sys.executable, str(script), "--no-push"],
             cwd=str(SCRIPT_DIR),
             capture_output=True,
             text=True,
@@ -199,13 +206,11 @@ def run_cycle() -> int:
         return 0
     print("✅ Scraper completado")
 
-    # 1b. Subir alertas a GitHub (para que la página se actualice)
-    push_to_github()
-
     # 2. Cargar alertas y detectar nuevas
     alertas = get_latest_alerts()
     if not alertas:
         print("   No hay alertas en el archivo más reciente")
+        push_to_github()
         return 0
 
     sent_ids = load_sent_ids()
@@ -227,30 +232,46 @@ def run_cycle() -> int:
     if not nuevas:
         activas_total = sum(1 for a in alertas if (a.get("status") or "").upper() == "ACTIVE")
         print(f"   No hay alertas nuevas activas ({activas_total} activas ya conocidas)")
+        run_analisis_lecturas()
+        push_to_github()
         return 0
 
     print(f"   {len(nuevas)} alerta(s) nueva(s) activa(s) detectada(s)")
 
-    # 3. Enviar cada alerta nueva a Todas las regiones + grupo de su región (si aplica)
+    # 3. Enviar cada alerta nueva (máx. 3 intentos por alerta)
+    MAX_INTENTOS = 3
     enviadas = 0
     for i, alerta in enumerate(nuevas, 1):
-        try:
-            send_single_alert(alerta)
-            sent_ids.add(alerta["id"])
-            save_sent_ids(sent_ids)
-            enviadas += 1
-            region = alerta.get("region", "?")
-            titulo = (alerta.get("title") or "Sin título")[:50]
-            grupos = "Todas + " + region if region and region != "Desconocida" and "no aplica" not in (region or "").lower() else "Todas"
-            print(f"   ✅ [{i}/{len(nuevas)}] Enviada a {grupos}: {titulo}...")
-            # Pequeña pausa entre mensajes para evitar rate limits
-            if i < len(nuevas):
-                time.sleep(2)
-        except Exception as e:
-            print(f"   ❌ Error enviando alerta {alerta.get('id')}: {e}")
+        region = alerta.get("region", "?")
+        titulo = (alerta.get("title") or "Sin título")[:50]
+        grupos = "Todas + " + region if region and region != "Desconocida" and "no aplica" not in (region or "").lower() else "Todas"
+        ultimo_error = None
+        for intento in range(1, MAX_INTENTOS + 1):
+            try:
+                send_single_alert(alerta)
+                enviadas += 1
+                if intento > 1:
+                    print(f"   ✅ [{i}/{len(nuevas)}] Enviada a {grupos} (intento {intento}): {titulo}...")
+                else:
+                    print(f"   ✅ [{i}/{len(nuevas)}] Enviada a {grupos}: {titulo}...")
+                break
+            except Exception as e:
+                ultimo_error = e
+                print(f"   ⚠️ [{i}/{len(nuevas)}] Intento {intento}/{MAX_INTENTOS} falló: {e}")
+                if intento < MAX_INTENTOS:
+                    time.sleep(3)  # Pausa antes de reintentar
+        else:
+            print(f"   ❌ [{i}/{len(nuevas)}] Alerta {alerta.get('id')} no enviada tras {MAX_INTENTOS} intentos: {ultimo_error}")
+        # Marcar como enviada siempre para no reintentar en el próximo ciclo
+        sent_ids.add(alerta["id"])
+        save_sent_ids(sent_ids)
+        # Pequeña pausa entre mensajes para evitar rate limits
+        if i < len(nuevas):
+            time.sleep(2)
 
-    # 4. Tras enviar alertas: analizar lecturas y subir estadísticas a GitHub
+    # 4. Tras enviar alertas: analizar lecturas y subir todo a GitHub
     run_analisis_lecturas()
+    push_to_github()
 
     return enviadas
 

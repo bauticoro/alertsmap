@@ -250,7 +250,8 @@ def send_single_alert(alert: dict) -> Optional[dict]:
                     map_image = generate_map_image(lat, lon)
                     result = send_image_with_caption(map_image, mensaje, group_id=gid)
                 except requests.exceptions.HTTPError as e:
-                    if e.response is not None and e.response.status_code == 404:
+                    if e.response is not None and e.response.status_code in (404, 403):
+                        # 404: endpoint no existe; 403: sin permiso para imágenes → fallback a texto
                         result = send_message(mensaje, group_id=gid)
                     else:
                         raise
